@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn } from "../lib/cn";
 import { Icon, type IconName } from "./med-icon";
 
 const navigation: { label: string; href: string; icon: IconName }[] = [
@@ -13,10 +12,12 @@ const navigation: { label: string; href: string; icon: IconName }[] = [
 ];
 
 function navClass(active: boolean) {
-  return cn(
-    "flex items-center gap-3 rounded-lg border-0 bg-transparent px-3 py-2.5 text-left text-[#56625c] no-underline transition-colors",
-    active ? "bg-teal-soft font-bold text-teal nav-item-active" : "hover:bg-teal-soft hover:text-teal",
-  );
+  const base =
+    "flex items-center gap-3 rounded-lg border-0 bg-transparent px-3 py-2.5 text-left text-[#56625c] no-underline transition-colors";
+  const state = active
+    ? "bg-teal-soft font-bold text-teal nav-item-active"
+    : "hover:bg-teal-soft hover:text-teal";
+  return `${base} ${state}`;
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {

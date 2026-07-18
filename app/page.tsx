@@ -23,13 +23,7 @@ export default function DashboardPage() {
             <h1>Good morning, Alex.</h1>
             <p className="subhead">Here&apos;s what&apos;s on the schedule.</p>
           </div>
-          <div className="weather">
-            <span>☀</span>
-            <div>
-              <strong>27°C</strong>
-              <small>Cape Coast, GH</small>
-            </div>
-          </div>
+       
         </section>
 
         <section className="today-card">
