@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/app/lib/supabase/server";
+// import { createClient } from "@/app/lib/supabase/server"; // re-enable with auth
 import { extractPrescription } from "@/app/lib/prescriptions";
 import type { ReadPrescriptionState } from "@/app/lib/prescriptions/types";
 
@@ -11,14 +11,16 @@ export async function readPrescription(
   _prev: ReadPrescriptionState,
   formData: FormData,
 ): Promise<ReadPrescriptionState> {
-  // Server Functions are reachable via direct POST, so authenticate here.
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { status: "error", message: "Please sign in to upload a prescription." };
-  }
+  // TODO(auth): re-enable before deploying. This action calls a paid / rate-limited
+  // API, so an unauthenticated endpoint can be abused. Disabled for now so the upload
+  // works without Supabase sign-in.
+  // const supabase = await createClient();
+  // const {
+  //   data: { user },
+  // } = await supabase.auth.getUser();
+  // if (!user) {
+  //   return { status: "error", message: "Please sign in to upload a prescription." };
+  // }
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
