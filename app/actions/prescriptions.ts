@@ -1,8 +1,8 @@
 "use server";
 
-// import { createClient } from "@/app/lib/supabase/server"; // re-enable with auth
+import { createClient } from "@/app/lib/supabase/server";
 import { extractPrescription } from "@/app/lib/prescriptions";
-import type { ReadPrescriptionState } from "@/app/lib/prescriptions/types";
+import type { ExtractedPrescription, ReadPrescriptionState } from "@/app/lib/prescriptions/types";
 
 const ACCEPTED_TYPES = new Set(["image/png", "image/jpeg", "application/pdf"]);
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -11,16 +11,15 @@ export async function readPrescription(
   _prev: ReadPrescriptionState,
   formData: FormData,
 ): Promise<ReadPrescriptionState> {
-  // TODO(auth): re-enable before deploying. This action calls a paid / rate-limited
-  // API, so an unauthenticated endpoint can be abused. Disabled for now so the upload
-  // works without Supabase sign-in.
-  // const supabase = await createClient();
-  // const {
-  //   data: { user },
-  // } = await supabase.auth.getUser();
-  // if (!user) {
-  //   return { status: "error", message: "Please sign in to upload a prescription." };
-  // }
+  // Authenticate: the prescription is stored against this user, and the endpoint
+  // must not be open (it calls a paid / rate-limited API).
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { status: "error", message: "Please sign in to upload a prescription." };
+  }
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
@@ -33,13 +32,25 @@ export async function readPrescription(
     return { status: "error", message: "That file is too large (max 5 MB)." };
   }
 
+  let data: ExtractedPrescription;
   try {
-    const data = await extractPrescription(await file.arrayBuffer(), file.type);
-    return { status: "success", data };
+    data = await extractPrescription(await file.arrayBuffer(), file.type);
   } catch (error) {
     return {
       status: "error",
       message: error instanceof Error ? error.message : "Could not read the prescription.",
     };
   }
+
+  // Persist to Supabase. Row-level security scopes the row to this user via user_id.
+  const { error: dbError } = await supabase.from("prescriptions").insert({
+    user_id: user.id,
+    patient_name: data.patientName,
+    medications: data.medications,
+  });
+  if (dbError) {
+    return { status: "error", message: "Read the prescription, but could not save it." };
+  }
+
+  return { status: "success", data };
 }
