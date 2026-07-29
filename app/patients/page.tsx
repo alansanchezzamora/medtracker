@@ -1,12 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { AppShell } from "../components/app-shell";
 import { Icon } from "../components/med-icon";
 import { cn, patientTone, type PatientTone } from "../lib/cn";
-import { patients } from "../lib/demo-data";
+import { doses, patients } from "../lib/demo-data";
+import { resolveSchedule } from "../lib/time";
+import { useNow } from "../lib/use-now";
 
 export default function PatientsPage() {
+  const now = useNow();
+  const liveDoses = useMemo(() => (now ? resolveSchedule(doses, now) : doses), [now]);
+
   return (
     <AppShell>
       <div className="page-wrap">
@@ -22,28 +28,40 @@ export default function PatientsPage() {
           </Link>
         </div>
         <section className="patient-grid">
-          {patients.map((person) => (
-            <Link className="patient-card" href={`/patients/${person.id}`} key={person.id}>
-              <span className={cn("patient-avatar", patientTone[person.tone as PatientTone])}>{person.initial}</span>
-              <div>
-                <h2>{person.name}</h2>
-                <p>
-                  {person.age} · {person.prescriptions} active prescription{person.prescriptions === 1 ? "" : "s"}
-                </p>
-              </div>
-              <span className="card-chevron">
-                <Icon name="arrow" size={18} />
-              </span>
-              <div className="patient-card-footer">
-                <span>
-                  Next dose <b className="mono">{person.nextDose}</b>
+          {patients.map((person) => {
+            const nextForPatient = liveDoses.find(
+              (dose) => dose.patientId === person.id && (dose.state === "Next dose" || dose.state === "Upcoming"),
+            );
+
+            return (
+              <Link className="patient-card" href={`/patients/${person.id}`} key={person.id}>
+                <span className={cn("patient-avatar", patientTone[person.tone as PatientTone])}>{person.initial}</span>
+                <div>
+                  <h2>{person.name}</h2>
+                  <p>
+                    {person.age} · {person.prescriptions} active prescription{person.prescriptions === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <span className="card-chevron">
+                  <Icon name="arrow" size={18} />
                 </span>
-                <span>
-                  <b>{person.adherence}</b> adherence this week
-                </span>
-              </div>
-            </Link>
-          ))}
+                <div className="patient-card-footer">
+                  <span>
+                    {nextForPatient ? (
+                      <>
+                        Next dose <b className="mono">{nextForPatient.time}</b>
+                      </>
+                    ) : (
+                      <>All doses done today</>
+                    )}
+                  </span>
+                  <span>
+                    <b>{person.adherence}</b> adherence this week
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
         </section>
       </div>
     </AppShell>

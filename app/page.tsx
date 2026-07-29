@@ -1,17 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AppShell } from "./components/app-shell";
 import { Icon } from "./components/med-icon";
+import { useCurrentUser } from "./lib/auth/use-current-user";
 import { doses as scheduleDoses, patients } from "./lib/demo-data";
+import { formatCountdown, greetingForHour, minutesUntilTime, resolveSchedule } from "./lib/time";
+import { useNow } from "./lib/use-now";
 
 export default function DashboardPage() {
-  const [taken, setTaken] = useState(false);
+  const { user } = useCurrentUser();
+  const now = useNow();
+  // Session-only confirms until dose logs are stored in the DB.
+  const [takenIds, setTakenIds] = useState<Set<string>>(() => new Set());
   const [notice, setNotice] = useState("");
-  const confirmDose = () => {
-    setTaken(true);
-    setNotice("Dose marked as taken — Mia is on schedule.");
+
+  // Recompute Taken / Next / Upcoming from the client clock + any manual confirms.
+  const liveDoses = useMemo(() => (now ? resolveSchedule(scheduleDoses, now, takenIds) : scheduleDoses), [now, takenIds]);
+  const nextDose = liveDoses.find((dose) => dose.state === "Next dose") ?? liveDoses.find((dose) => dose.state === "Upcoming");
+  const allDone = liveDoses.every((dose) => dose.state === "Taken");
+  const greetingName = user?.firstName ?? "there";
+  // "Hello" until useNow hydrates — avoids flashing the wrong time-of-day greeting.
+  const greeting = now ? greetingForHour(now.getHours()) : "Hello";
+  const countdown =
+    now && nextDose && nextDose.state !== "Taken" ? formatCountdown(minutesUntilTime(nextDose.time, now)) : "DONE";
+
+  const confirmDose = (doseId: string, child: string) => {
+    setTakenIds((current) => new Set(current).add(doseId));
+    setNotice(`Dose marked as taken — ${child} is on schedule.`);
   };
 
   return (
@@ -20,46 +37,73 @@ export default function DashboardPage() {
         <section className="welcome-row">
           <div>
             <p className="eyebrow">YOUR FAMILY&apos;S DAY</p>
-            <h1>Good morning, Alex.</h1>
+            <h1>
+              {greeting}, {greetingName}.
+            </h1>
             <p className="subhead">Here&apos;s what&apos;s on the schedule.</p>
           </div>
-       
         </section>
 
         <section className="today-card">
-          <div className="card-label">
-            <span className="pulse" />
-            NEXT DOSE <span className="label-divider" /> IN 42 MIN
-          </div>
-          <div className="dose-hero">
-            <div className="child-avatar peach">M</div>
-            <div className="dose-copy">
-              <span className="mono time">14:00</span>
-              <div>
-                <h2>
-                  Amoxicillin <span className="mono">5 mL</span>
-                </h2>
-                <p>for Mia · with food if possible</p>
+          {allDone || !nextDose ? (
+            <>
+              <div className="card-label">
+                <span className="pulse" />
+                TODAY&apos;S DOSES <span className="label-divider" /> COMPLETE
               </div>
-            </div>
-            <button className={`confirm-dose ${taken ? "confirmed" : ""}`} onClick={confirmDose}>
-              {taken ? (
-                <>
-                  <Icon name="check" size={19} />
-                  Dose taken
-                </>
-              ) : (
-                <>
-                  <Icon name="check" size={19} />
-                  Confirm dose
-                </>
-              )}
-            </button>
-          </div>
-          <div className="dose-note">
-            <Icon name="bell" size={16} />
-            A WhatsApp reminder will be sent at <span className="mono">14:00</span>.
-          </div>
+              <div className="dose-hero">
+                <div className="child-avatar peach">✓</div>
+                <div className="dose-copy">
+                  <div>
+                    <h2>All caught up</h2>
+                    <p>Every scheduled dose for today has been confirmed.</p>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="card-label">
+                <span className="pulse" />
+                NEXT DOSE <span className="label-divider" /> {countdown}
+              </div>
+              <div className="dose-hero">
+                <div className={`child-avatar ${nextDose.patientId === "mia" ? "peach" : "blue"}`}>{nextDose.child[0]}</div>
+                <div className="dose-copy">
+                  <span className="mono time">{nextDose.time}</span>
+                  <div>
+                    <h2>
+                      {nextDose.medicine} <span className="mono">{nextDose.amount}</span>
+                    </h2>
+                    <p>
+                      for {nextDose.child}
+                      {nextDose.detail ? ` · ${nextDose.detail}` : ""}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  className={`confirm-dose ${takenIds.has(nextDose.id) ? "confirmed" : ""}`}
+                  onClick={() => confirmDose(nextDose.id, nextDose.child)}
+                >
+                  {takenIds.has(nextDose.id) ? (
+                    <>
+                      <Icon name="check" size={19} />
+                      Dose taken
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="check" size={19} />
+                      Confirm dose
+                    </>
+                  )}
+                </button>
+              </div>
+              <div className="dose-note">
+                <Icon name="bell" size={16} />
+                A WhatsApp reminder will be sent at <span className="mono">{nextDose.time}</span>.
+              </div>
+            </>
+          )}
         </section>
 
         {notice && (
@@ -75,7 +119,9 @@ export default function DashboardPage() {
         <div className="section-heading">
           <div>
             <h2>Today&apos;s schedule</h2>
-            <p>4 doses across 2 patients</p>
+            <p>
+              {liveDoses.length} doses across {patients.length} patients
+            </p>
           </div>
           <Link className="text-button" href="/history">
             View history <Icon name="arrow" size={16} />
@@ -83,7 +129,7 @@ export default function DashboardPage() {
         </div>
 
         <section className="schedule">
-          {scheduleDoses.map((dose, index) => (
+          {liveDoses.map((dose) => (
             <article className={`schedule-row ${dose.state === "Next dose" ? "is-next" : ""}`} key={dose.id}>
               <time className="mono">{dose.time}</time>
               <span className={`timeline-dot ${dose.state === "Taken" ? "done" : ""}`} />
@@ -100,8 +146,12 @@ export default function DashboardPage() {
                 {dose.state === "Taken" && <Icon name="check" size={14} />}
                 {dose.state}
               </span>
-              {index === 1 && (
-                <button className="row-check" onClick={confirmDose} aria-label="Confirm Mia's 14:00 dose">
+              {dose.state === "Next dose" && (
+                <button
+                  className="row-check"
+                  onClick={() => confirmDose(dose.id, dose.child)}
+                  aria-label={`Confirm ${dose.child}'s ${dose.time} dose`}
+                >
                   <Icon name="check" size={19} />
                 </button>
               )}
@@ -114,25 +164,34 @@ export default function DashboardPage() {
             <div className="card-title">
               <div>
                 <h2>Your family</h2>
-                <p>2 active patients</p>
+                <p>
+                  {patients.length} active patients
+                </p>
               </div>
               <Link className="round-add" href="/patients/new" aria-label="Add patient">
                 <Icon name="plus" size={18} />
               </Link>
             </div>
             <div className="family-members">
-              {patients.map((person) => (
-                <Link className="member-link" href={`/patients/${person.id}`} key={person.id}>
-                  <span className={`child-avatar ${person.tone} small`}>{person.initial}</span>
-                  <span>
-                    <strong>{person.name}</strong>
-                    <small>{person.prescriptions} active prescription</small>
-                  </span>
-                  <span className="adherence">
-                    <b>{person.adherence}</b> this week
-                  </span>
-                </Link>
-              ))}
+              {patients.map((person) => {
+                const nextForPatient = liveDoses.find(
+                  (dose) => dose.patientId === person.id && (dose.state === "Next dose" || dose.state === "Upcoming"),
+                );
+                return (
+                  <Link className="member-link" href={`/patients/${person.id}`} key={person.id}>
+                    <span className={`child-avatar ${person.tone} small`}>{person.initial}</span>
+                    <span>
+                      <strong>{person.name}</strong>
+                      <small>
+                        {nextForPatient ? `Next dose ${nextForPatient.time}` : "All doses done today"}
+                      </small>
+                    </span>
+                    <span className="adherence">
+                      <b>{person.adherence}</b> this week
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           </article>
           <article className="upload-card">
