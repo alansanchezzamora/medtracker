@@ -1,4 +1,6 @@
 -- MedTracker schema — prescriptions, profiles, reminders.
+-- Run this in the Supabase dashboard: SQL Editor -> paste -> Run.
+-- (Or, with the Supabase CLI linked: `supabase db push`.)
 
 -- ---------------------------------------------------------------------------
 -- Prescriptions
