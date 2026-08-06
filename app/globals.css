@@ -102,11 +102,11 @@
   }
 
   .page-wrap {
-    @apply mx-auto max-w-[1130px] px-[clamp(22px,4vw,61px)] pb-[62px] pt-12 max-[700px]:px-4 max-[700px]:pb-[42px] max-[700px]:pt-8;
+    @apply mx-auto max-w-[1130px] px-4 pb-8 pt-6 sm:px-5 sm:pb-10 sm:pt-8 lg:px-[clamp(22px,4vw,61px)] lg:pb-[62px] lg:pt-12;
   }
 
   .form-wrap {
-    @apply mx-auto max-w-[670px] px-[clamp(22px,4vw,61px)] pb-[62px] pt-12 max-[700px]:px-4 max-[700px]:pb-[42px] max-[700px]:pt-8;
+    @apply mx-auto max-w-[670px] px-4 pb-8 pt-6 sm:px-5 sm:pb-10 sm:pt-8 lg:px-[clamp(22px,4vw,61px)] lg:pb-[62px] lg:pt-12;
   }
 
   .page-heading {
@@ -128,15 +128,15 @@
   }
 
   .dashboard {
-    @apply mx-auto max-w-[1130px] px-[clamp(22px,4vw,61px)] pb-[58px] pt-[47px] max-[850px]:pt-[34px] max-[620px]:px-4 max-[620px]:pb-10 max-[620px]:pt-[30px];
+    @apply mx-auto max-w-[1130px] px-4 pb-8 pt-6 sm:px-5 sm:pb-10 sm:pt-8 lg:px-[clamp(22px,4vw,61px)] lg:pb-[58px] lg:pt-[47px];
   }
 
   .welcome-row {
-    @apply mb-7 flex items-end justify-between max-[620px]:mb-6;
+    @apply mb-5 flex items-end justify-between sm:mb-7;
   }
 
   .welcome-row h1 {
-    @apply mb-2 text-[39px] leading-tight max-[850px]:text-[34px] max-[620px]:text-[31px];
+    @apply mb-2 text-[28px] leading-tight sm:text-[34px] lg:text-[39px];
   }
 
   .weather {
@@ -722,5 +722,68 @@
 @media (max-width: 620px) {
   .schedule-row:nth-child(n + 3) .row-check {
     display: none;
+  }
+}
+
+/* Auth pages — soft paper field with care atmosphere */
+.auth-atmosphere {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 55% at 12% 18%, rgba(31, 110, 99, 0.11), transparent 58%),
+    radial-gradient(ellipse 55% 45% at 88% 12%, rgba(201, 122, 43, 0.12), transparent 52%),
+    radial-gradient(ellipse 50% 40% at 70% 88%, rgba(242, 209, 188, 0.35), transparent 55%),
+    linear-gradient(165deg, #f8f6f0 0%, var(--color-paper) 45%, #efebe3 100%);
+  pointer-events: none;
+}
+
+.auth-atmosphere::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  background-image: repeating-linear-gradient(
+    -12deg,
+    transparent,
+    transparent 11px,
+    rgba(33, 48, 42, 0.015) 11px,
+    rgba(33, 48, 42, 0.015) 12px
+  );
+}
+
+.auth-panel {
+  animation: auth-rise 0.55s ease-out both;
+}
+
+.auth-shell > .relative > a {
+  animation: auth-rise 0.45s ease-out both;
+}
+
+.auth-shell > .relative > p {
+  animation: auth-rise 0.65s ease-out both;
+}
+
+@keyframes auth-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-panel,
+  .auth-shell > .relative > a,
+  .auth-shell > .relative > p {
+    animation: none;
+  }
+
+  #mobile-nav-drawer,
+  #mobile-nav-drawer ~ button,
+  [aria-controls="mobile-nav-drawer"] + * {
+    transition: none !important;
   }
 }

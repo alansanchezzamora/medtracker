@@ -1,3 +1,5 @@
+// Thin wrapper around Material Symbols so pages don't hardcode glyph names.
+
 const symbols = {
   grid: "dashboard",
   people: "group",
@@ -14,10 +16,16 @@ const symbols = {
   calendar: "calendar_month",
   phone: "phone",
   edit: "edit",
+  menu: "menu",
+  close: "close",
 } as const;
 
 export type IconName = keyof typeof symbols;
 
 export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
-  return <span className="material-symbols-rounded" style={{ fontSize: size }} aria-hidden="true">{symbols[name]}</span>;
+  return (
+    <span className="material-symbols-rounded" style={{ fontSize: size }} aria-hidden="true">
+      {symbols[name]}
+    </span>
+  );
 }

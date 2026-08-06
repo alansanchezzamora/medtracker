@@ -1,3 +1,6 @@
+// Stand-in family data until patients / prescriptions / doses live in Supabase.
+// UI screens import from here so we can swap the source later without rewriting pages.
+
 export const patients = [
   { id: "mia", name: "Mia Johnson", initial: "M", tone: "peach", age: "7 years", prescriptions: 1, adherence: "100%", nextDose: "14:00" },
   { id: "leo", name: "Leo Johnson", initial: "L", tone: "blue", age: "4 years", prescriptions: 1, adherence: "92%", nextDose: "18:30" },
@@ -12,12 +15,12 @@ export type DoseState = "Taken" | "Missed" | "Next dose" | "Upcoming";
 
 export type Dose = {
   id: string;
-  time: string;
+  time: string; // "HH:mm" — resolveSchedule compares this to the client clock
   medicine: string;
   amount: string;
   child: string;
   patientId: string;
-  state: DoseState;
+  state: DoseState; // initial seed; live screens overwrite via resolveSchedule
   detail?: string;
 };
 
