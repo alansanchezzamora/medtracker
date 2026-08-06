@@ -1,34 +1,85 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { AppShell } from "./components/app-shell";
 import { Icon } from "./components/med-icon";
+import { confirmDoseTaken, getTodaySchedule } from "./actions/schedule";
 import { useCurrentUser } from "./lib/auth/use-current-user";
-import { doses as scheduleDoses, patients } from "./lib/demo-data";
+import type { Dose, SchedulePatient } from "./lib/schedule/types";
 import { formatCountdown, greetingForHour, minutesUntilTime, resolveSchedule } from "./lib/time";
 import { useNow } from "./lib/use-now";
 
 export default function DashboardPage() {
   const { user } = useCurrentUser();
   const now = useNow();
-  // Session-only confirms until dose logs are stored in the DB.
+  const [doses, setDoses] = useState<Dose[]>([]);
+  const [patients, setPatients] = useState<SchedulePatient[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [takenIds, setTakenIds] = useState<Set<string>>(() => new Set());
   const [notice, setNotice] = useState("");
+  const [pending, startTransition] = useTransition();
 
-  // Recompute Taken / Next / Upcoming from the client clock + any manual confirms.
-  const liveDoses = useMemo(() => (now ? resolveSchedule(scheduleDoses, now, takenIds) : scheduleDoses), [now, takenIds]);
-  const nextDose = liveDoses.find((dose) => dose.state === "Next dose") ?? liveDoses.find((dose) => dose.state === "Upcoming");
-  const allDone = liveDoses.every((dose) => dose.state === "Taken");
+  const refresh = useCallback(async () => {
+    const result = await getTodaySchedule();
+    if (!result.ok) {
+      setLoadError(result.error);
+      setDoses([]);
+      setPatients([]);
+      setLoading(false);
+      return;
+    }
+    setLoadError("");
+    setDoses(result.doses);
+    setPatients(result.patients);
+    setTakenIds(
+      new Set(
+        result.doses
+          .filter((d) => d.state === "Taken" || d.reminderStatus === "taken")
+          .map((d) => d.id),
+      ),
+    );
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const liveDoses = useMemo(
+    () => (now ? resolveSchedule(doses, now, takenIds) : doses),
+    [now, doses, takenIds],
+  );
+  const nextDose =
+    liveDoses.find((dose) => dose.state === "Next dose") ??
+    liveDoses.find((dose) => dose.state === "Upcoming");
+  const allDone =
+    liveDoses.length > 0 && liveDoses.every((dose) => dose.state === "Taken");
   const greetingName = user?.firstName ?? "there";
-  // "Hello" until useNow hydrates — avoids flashing the wrong time-of-day greeting.
   const greeting = now ? greetingForHour(now.getHours()) : "Hello";
   const countdown =
-    now && nextDose && nextDose.state !== "Taken" ? formatCountdown(minutesUntilTime(nextDose.time, now)) : "DONE";
+    now && nextDose && nextDose.state !== "Taken"
+      ? formatCountdown(minutesUntilTime(nextDose.time, now))
+      : "DONE";
 
   const confirmDose = (doseId: string, child: string) => {
     setTakenIds((current) => new Set(current).add(doseId));
     setNotice(`Dose marked as taken — ${child} is on schedule.`);
+    startTransition(async () => {
+      const result = await confirmDoseTaken(doseId);
+      if (!result.ok) {
+        setTakenIds((current) => {
+          const next = new Set(current);
+          next.delete(doseId);
+          return next;
+        });
+        setNotice("");
+        setLoadError(result.error);
+        return;
+      }
+      await refresh();
+    });
   };
 
   return (
@@ -44,8 +95,48 @@ export default function DashboardPage() {
           </div>
         </section>
 
+        {loadError && (
+          <div className="mb-4 rounded-lg border border-[#e8c5bc] bg-[#f8ece8] px-3 py-2.5 text-sm text-coral" role="alert">
+            {loadError}
+          </div>
+        )}
+
         <section className="today-card">
-          {allDone || !nextDose ? (
+          {loading ? (
+            <>
+              <div className="card-label">
+                <span className="pulse" />
+                TODAY&apos;S DOSES <span className="label-divider" /> LOADING
+              </div>
+              <div className="dose-hero">
+                <div className="dose-copy">
+                  <div>
+                    <h2>Loading schedule…</h2>
+                    <p>Pulling today&apos;s reminders from your account.</p>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : liveDoses.length === 0 ? (
+            <>
+              <div className="card-label">
+                <span className="pulse" />
+                TODAY&apos;S DOSES <span className="label-divider" /> NONE YET
+              </div>
+              <div className="dose-hero">
+                <div className="child-avatar peach">+</div>
+                <div className="dose-copy">
+                  <div>
+                    <h2>No doses scheduled today</h2>
+                    <p>Upload a prescription to create reminders for your family.</p>
+                  </div>
+                </div>
+                <Link className="confirm-dose" href="/prescriptions/new">
+                  Add prescription
+                </Link>
+              </div>
+            </>
+          ) : allDone || !nextDose ? (
             <>
               <div className="card-label">
                 <span className="pulse" />
@@ -68,7 +159,9 @@ export default function DashboardPage() {
                 NEXT DOSE <span className="label-divider" /> {countdown}
               </div>
               <div className="dose-hero">
-                <div className={`child-avatar ${nextDose.patientId === "mia" ? "peach" : "blue"}`}>{nextDose.child[0]}</div>
+                <div className={`child-avatar ${nextDose.patientId.includes("leo") || patients.find((p) => p.id === nextDose.patientId)?.tone === "blue" ? "blue" : "peach"}`}>
+                  {nextDose.child[0]}
+                </div>
                 <div className="dose-copy">
                   <span className="mono time">{nextDose.time}</span>
                   <div>
@@ -84,6 +177,7 @@ export default function DashboardPage() {
                 <button
                   className={`confirm-dose ${takenIds.has(nextDose.id) ? "confirmed" : ""}`}
                   onClick={() => confirmDose(nextDose.id, nextDose.child)}
+                  disabled={pending}
                 >
                   {takenIds.has(nextDose.id) ? (
                     <>
@@ -100,7 +194,8 @@ export default function DashboardPage() {
               </div>
               <div className="dose-note">
                 <Icon name="bell" size={16} />
-                A WhatsApp reminder will be sent at <span className="mono">{nextDose.time}</span>.
+                A WhatsApp reminder will be sent at <span className="mono">{nextDose.time}</span>
+                {nextDose.reminderStatus === "sent" ? " (already sent)." : "."}
               </div>
             </>
           )}
@@ -120,7 +215,8 @@ export default function DashboardPage() {
           <div>
             <h2>Today&apos;s schedule</h2>
             <p>
-              {liveDoses.length} doses across {patients.length} patients
+              {liveDoses.length} dose{liveDoses.length === 1 ? "" : "s"}
+              {patients.length ? ` across ${patients.length} patient${patients.length === 1 ? "" : "s"}` : ""}
             </p>
           </div>
           <Link className="text-button" href="/history">
@@ -129,34 +225,48 @@ export default function DashboardPage() {
         </div>
 
         <section className="schedule">
-          {liveDoses.map((dose) => (
-            <article className={`schedule-row ${dose.state === "Next dose" ? "is-next" : ""}`} key={dose.id}>
-              <time className="mono">{dose.time}</time>
-              <span className={`timeline-dot ${dose.state === "Taken" ? "done" : ""}`} />
-              <div className={`row-avatar ${dose.patientId === "mia" ? "peach" : "blue"}`}>{dose.child[0]}</div>
-              <div className="medicine">
-                <h3>
-                  {dose.medicine} <span className="mono">{dose.amount}</span>
-                </h3>
-                <p>
-                  for {dose.child} · {dose.detail}
-                </p>
-              </div>
-              <span className={`status ${dose.state.toLowerCase().replace(" ", "-")}`}>
-                {dose.state === "Taken" && <Icon name="check" size={14} />}
-                {dose.state}
-              </span>
-              {dose.state === "Next dose" && (
-                <button
-                  className="row-check"
-                  onClick={() => confirmDose(dose.id, dose.child)}
-                  aria-label={`Confirm ${dose.child}'s ${dose.time} dose`}
-                >
-                  <Icon name="check" size={19} />
-                </button>
-              )}
-            </article>
-          ))}
+          {!loading && liveDoses.length === 0 && (
+            <p className="text-muted px-1 py-4 text-sm">
+              No reminders for today.{" "}
+              <Link className="text-button" href="/prescriptions/new">
+                Scan a prescription
+              </Link>{" "}
+              to generate a schedule.
+            </p>
+          )}
+          {liveDoses.map((dose) => {
+            const tone = patients.find((p) => p.id === dose.patientId)?.tone ?? "peach";
+            return (
+              <article className={`schedule-row ${dose.state === "Next dose" ? "is-next" : ""}`} key={dose.id}>
+                <time className="mono">{dose.time}</time>
+                <span className={`timeline-dot ${dose.state === "Taken" ? "done" : ""}`} />
+                <div className={`row-avatar ${tone}`}>{dose.child[0]}</div>
+                <div className="medicine">
+                  <h3>
+                    {dose.medicine} <span className="mono">{dose.amount}</span>
+                  </h3>
+                  <p>
+                    for {dose.child}
+                    {dose.detail ? ` · ${dose.detail}` : ""}
+                  </p>
+                </div>
+                <span className={`status ${dose.state.toLowerCase().replace(" ", "-")}`}>
+                  {dose.state === "Taken" && <Icon name="check" size={14} />}
+                  {dose.state}
+                </span>
+                {dose.state === "Next dose" && (
+                  <button
+                    className="row-check"
+                    onClick={() => confirmDose(dose.id, dose.child)}
+                    aria-label={`Confirm ${dose.child}'s ${dose.time} dose`}
+                    disabled={pending}
+                  >
+                    <Icon name="check" size={19} />
+                  </button>
+                )}
+              </article>
+            );
+          })}
         </section>
 
         <section className="bottom-grid">
@@ -165,29 +275,40 @@ export default function DashboardPage() {
               <div>
                 <h2>Your family</h2>
                 <p>
-                  {patients.length} active patients
+                  {patients.length} active patient{patients.length === 1 ? "" : "s"}
                 </p>
               </div>
-              <Link className="round-add" href="/patients/new" aria-label="Add patient">
+              <Link className="round-add" href="/prescriptions/new" aria-label="Add prescription">
                 <Icon name="plus" size={18} />
               </Link>
             </div>
             <div className="family-members">
+              {patients.length === 0 && (
+                <p className="text-muted px-1 py-2 text-sm">
+                  Patients appear here after you save a prescription.
+                </p>
+              )}
               {patients.map((person) => {
                 const nextForPatient = liveDoses.find(
-                  (dose) => dose.patientId === person.id && (dose.state === "Next dose" || dose.state === "Upcoming"),
+                  (dose) =>
+                    dose.patientId === person.id &&
+                    (dose.state === "Next dose" || dose.state === "Upcoming"),
                 );
                 return (
-                  <Link className="member-link" href={`/patients/${person.id}`} key={person.id}>
+                  <Link className="member-link" href="/prescriptions" key={person.id}>
                     <span className={`child-avatar ${person.tone} small`}>{person.initial}</span>
                     <span>
                       <strong>{person.name}</strong>
                       <small>
-                        {nextForPatient ? `Next dose ${nextForPatient.time}` : "All doses done today"}
+                        {nextForPatient
+                          ? `Next dose ${nextForPatient.time}`
+                          : liveDoses.some((d) => d.patientId === person.id)
+                            ? "All doses done today"
+                            : "No doses today"}
                       </small>
                     </span>
                     <span className="adherence">
-                      <b>{person.adherence}</b> this week
+                      <b>{person.adherence}</b> today
                     </span>
                   </Link>
                 );
