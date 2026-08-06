@@ -1,4 +1,4 @@
-import type { Dose, DoseState } from "./demo-data";
+import type { Dose, DoseState } from "./schedule/types";
 
 // Helpers for greetings, date labels, and "is this dose next?" against the client's clock.
 
@@ -42,24 +42,32 @@ export function formatCountdown(minutesUntilDose: number) {
 }
 
 /**
- * Turns static demo doses into a live schedule for "today".
- * Past times (plus a 20 min grace) count as taken; first remaining is "Next dose".
- * Replace this when we persist real dose logs.
+ * Turns today's doses into a live schedule.
+ * Confirmed / already-taken rows stay Taken; past unconfirmed → Missed after grace;
+ * first remaining is "Next dose".
  */
 export function resolveSchedule(doses: Dose[], now: Date, takenIds: ReadonlySet<string> = new Set()): Dose[] {
   const nowMin = minutesFromMidnight(now);
   let nextAssigned = false;
 
   return doses.map((dose) => {
-    if (takenIds.has(dose.id)) {
+    if (
+      takenIds.has(dose.id) ||
+      dose.state === "Taken" ||
+      dose.reminderStatus === "taken"
+    ) {
       return { ...dose, state: "Taken" as DoseState };
+    }
+
+    if (dose.state === "Missed" || dose.reminderStatus === "missed") {
+      return { ...dose, state: "Missed" as DoseState };
     }
 
     const doseMin = parseTimeToMinutes(dose.time);
 
     // Grace so a dose at 14:00 isn't instantly "past" at 14:01.
     if (doseMin + 20 < nowMin) {
-      return { ...dose, state: "Taken" as DoseState };
+      return { ...dose, state: "Missed" as DoseState };
     }
 
     if (!nextAssigned) {

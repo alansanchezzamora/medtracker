@@ -7,6 +7,7 @@ import { useCurrentUser } from "../lib/auth/use-current-user";
 import { formatMonthDay, formatWeekday } from "../lib/time";
 import { useNow } from "../lib/use-now";
 import { Icon, type IconName } from "./med-icon";
+import { ReminderTicker } from "./reminder-ticker";
 
 // Shared primary routes. Desktop sidebar, mobile drawer, and bottom dock all read this list.
 const navigation: { label: string; href: string; icon: IconName }[] = [
@@ -118,6 +119,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-dvh bg-paper">
+      <ReminderTicker enabled={!loading && Boolean(user)} />
       {/* lg+: always-visible sidebar */}
       <aside className="hidden min-h-dvh w-[245px] shrink-0 flex-col border-r border-line bg-surface px-4 pb-[18px] pt-7 lg:flex">
         <div className="px-3 pb-9">{brand}</div>

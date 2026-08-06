@@ -8,11 +8,23 @@ function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.has(pathname);
 }
 
+/** Cron uses CRON_SECRET (Bearer), not a browser session. */
+function isCronPath(pathname: string) {
+  return pathname === "/api/cron/dispatch-reminders" || pathname.startsWith("/api/cron/");
+}
+
 /**
  * Next.js 16 request gate (proxy = old middleware).
  * Refreshes the auth cookie, then either lets the request through or redirects.
  */
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Let the cron route authenticate itself via CRON_SECRET.
+  if (isCronPath(pathname)) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -40,7 +52,6 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
   const onPublicPath = isPublicPath(pathname);
 
   // Not signed in → login, keep ?next= so we can send them back after.

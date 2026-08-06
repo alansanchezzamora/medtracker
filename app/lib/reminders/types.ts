@@ -3,6 +3,8 @@ export const REMINDER_STATUSES = [
   "sent",
   "failed",
   "cancelled",
+  "taken",
+  "missed",
 ] as const;
 
 export type ReminderStatus = (typeof REMINDER_STATUSES)[number];
