@@ -1,11 +1,33 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "../components/app-shell";
 import { Icon } from "../components/med-icon";
-import { prescriptions } from "../lib/demo-data";
+import { getPrescriptionCabinet } from "../actions/family";
+import type { CabinetMedication } from "../lib/family/from-prescriptions";
 
 export default function PrescriptionsPage() {
+  const [medications, setMedications] = useState<CabinetMedication[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const refresh = useCallback(async () => {
+    const result = await getPrescriptionCabinet();
+    if (!result.ok) {
+      setError(result.error);
+      setMedications([]);
+    } else {
+      setError("");
+      setMedications(result.medications);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
   return (
     <AppShell>
       <div className="page-wrap">
@@ -20,8 +42,23 @@ export default function PrescriptionsPage() {
             Add prescription
           </Link>
         </div>
+
+        {error && (
+          <div className="mb-4 rounded-lg border border-[#e8c5bc] bg-[#f8ece8] px-3 py-2.5 text-sm text-coral" role="alert">
+            {error}
+          </div>
+        )}
+
         <section className="prescription-list">
-          {prescriptions.map((item) => (
+          {loading && (
+            <p className="text-muted px-1 py-4 text-sm">Loading prescriptions…</p>
+          )}
+          {!loading && medications.length === 0 && (
+            <p className="text-muted px-1 py-4 text-sm">
+              No prescriptions yet. Scan one to fill this cabinet.
+            </p>
+          )}
+          {medications.map((item) => (
             <article className="prescription-card" key={item.id}>
               <span className={`prescription-tab ${item.tone}`} />
               <div className="prescription-main">
@@ -34,7 +71,8 @@ export default function PrescriptionsPage() {
                     {item.medicine} <span className="mono">{item.dosage}</span>
                   </h2>
                   <p>
-                    {item.frequency} · scheduled at <span className="mono">{item.schedule}</span>
+                    {item.frequency} · scheduled at{" "}
+                    <span className="mono">{item.schedule}</span>
                   </p>
                 </div>
               </div>
