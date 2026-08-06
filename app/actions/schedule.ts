@@ -8,6 +8,7 @@ import {
   type ReminderRow,
 } from "@/app/lib/schedule/from-reminders";
 import type { Dose, SchedulePatient } from "@/app/lib/schedule/types";
+import { toUserMessage } from "@/app/lib/user-error";
 
 export type TodayScheduleResult =
   | {
@@ -48,7 +49,7 @@ export async function getTodaySchedule(): Promise<TodayScheduleResult> {
     .order("scheduled_at", { ascending: true });
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: toUserMessage("schedule.getTodaySchedule", error, "Couldn't load today's schedule. Please try again.") };
   }
 
   const reminders = (data ?? []) as ReminderRow[];
@@ -122,15 +123,12 @@ export async function confirmDoseTaken(reminderId: string): Promise<ConfirmDoseR
     .eq("user_id", user.id);
 
   if (error) {
-    // Common when DB check constraint hasn't been updated yet.
+    // Common when the reminders status check constraint hasn't been updated yet.
     if (error.message.toLowerCase().includes("check") || error.code === "23514") {
-      return {
-        ok: false,
-        error:
-          "Database needs the 'taken' reminder status. Run the updated supabase/schema.sql (or alter the reminders status check).",
-      };
+      console.error("[schedule.confirmDoseTaken] status check constraint:", error.message);
+      return { ok: false, error: "Couldn't mark this dose as taken. Please try again in a moment." };
     }
-    return { ok: false, error: error.message };
+    return { ok: false, error: toUserMessage("schedule.confirmDoseTaken", error, "Couldn't update the dose. Please try again.") };
   }
 
   return { ok: true };

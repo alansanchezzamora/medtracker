@@ -16,6 +16,7 @@ import {
 } from "@/app/lib/schedule/from-reminders";
 import type { Dose } from "@/app/lib/schedule/types";
 import { resolveSchedule } from "@/app/lib/time";
+import { toUserMessage } from "@/app/lib/user-error";
 
 async function getTimezone(userId: string) {
   const supabase = await createClient();
@@ -49,7 +50,7 @@ export async function getPrescriptionCabinet(): Promise<PrescriptionCabinetResul
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: toUserMessage("family.getPrescriptionCabinet", error, "Couldn't load your prescriptions. Please try again.") };
 
   const medications = (data ?? []).flatMap((row) =>
     medicationsFromPrescription(row),
@@ -86,7 +87,7 @@ export async function getPatientsList(): Promise<PatientsListResult> {
       .order("scheduled_at", { ascending: true }),
   ]);
 
-  if (rxError) return { ok: false, error: rxError.message };
+  if (rxError) return { ok: false, error: toUserMessage("family.getPatientsList", rxError, "Couldn't load your patients. Please try again.") };
 
   const medications = (rx ?? []).flatMap((row) => medicationsFromPrescription(row));
   const doses = resolveSchedule(
@@ -151,7 +152,7 @@ export async function getPatientDetail(
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
-  if (rxError) return { ok: false, error: rxError.message };
+  if (rxError) return { ok: false, error: toUserMessage("family.getPatientDetail", rxError, "Couldn't load this patient. Please try again.") };
 
   const medications = (rx ?? [])
     .flatMap((row) => medicationsFromPrescription(row))
@@ -256,7 +257,7 @@ export async function getAdherenceHistory(): Promise<HistoryResult> {
     .lt("scheduled_at", endIso)
     .order("scheduled_at", { ascending: true });
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: toUserMessage("family.getAdherenceHistory", error, "Couldn't load your history. Please try again.") };
 
   const doses = resolveSchedule(
     remindersToDoses((todayReminders ?? []) as ReminderRow[]),
@@ -331,13 +332,10 @@ export async function setDoseStatus(
 
   if (error) {
     if (error.message.toLowerCase().includes("check") || error.code === "23514") {
-      return {
-        ok: false,
-        error:
-          "Database needs 'taken' and 'missed' reminder statuses. Run the status check update in supabase/schema.sql.",
-      };
+      console.error("[family.setDoseStatus] status check constraint:", error.message);
+      return { ok: false, error: "Couldn't update this dose. Please try again in a moment." };
     }
-    return { ok: false, error: error.message };
+    return { ok: false, error: toUserMessage("family.setDoseStatus", error, "Couldn't update the dose. Please try again.") };
   }
 
   return { ok: true };

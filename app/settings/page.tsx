@@ -9,6 +9,7 @@ import {
 import { sendTestWhatsAppReminder } from "../actions/notifications";
 import { AppShell } from "../components/app-shell";
 import { Icon } from "../components/med-icon";
+import { Toast } from "../components/toast";
 import { useCurrentUser } from "../lib/auth/use-current-user";
 
 const inputClass =
@@ -131,15 +132,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {notice && (
-          <div className="toast" role="status">
-            <Icon name="check" size={17} />
-            {notice}
-            <button onClick={() => setNotice("")} aria-label="Dismiss">
-              ×
-            </button>
-          </div>
-        )}
+        <Toast message={notice} onDismiss={() => setNotice("")} />
 
         {error && (
           <div className="mb-4 rounded-lg border border-[#e8c5bc] bg-[#f8ece8] px-3 py-2.5 text-sm text-coral" role="alert">
@@ -316,7 +309,7 @@ export default function SettingsPage() {
               <strong>{displayName}</strong>
               <small>Owner · Full access</small>
             </div>
-            <button className="secondary-link" onClick={() => setNotice("Caregiver invites will be available in a future update.")}>
+            <button type="button" className="secondary-link" onClick={() => setNotice("Caregiver invites will be available in a future update.")}>
               Manage
             </button>
           </div>

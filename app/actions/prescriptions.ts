@@ -4,6 +4,7 @@ import { createClient } from "@/app/lib/supabase/server";
 import { extractPrescription } from "@/app/lib/prescriptions";
 import type { ExtractedPrescription, ReadPrescriptionState } from "@/app/lib/prescriptions/types";
 import { expandMedicationsToReminders } from "@/app/lib/reminders/expand";
+import { toUserMessage } from "@/app/lib/user-error";
 
 const ACCEPTED_TYPES = new Set(["image/png", "image/jpeg", "application/pdf"]);
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -39,7 +40,7 @@ export async function readPrescription(
   } catch (error) {
     return {
       status: "error",
-      message: error instanceof Error ? error.message : "Could not read the prescription.",
+      message: toUserMessage("prescriptions.extract", error, "Couldn't read the prescription. Please try again in a moment."),
     };
   }
 

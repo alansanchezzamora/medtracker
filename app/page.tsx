@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { AppShell } from "./components/app-shell";
 import { Icon } from "./components/med-icon";
+import { Toast } from "./components/toast";
 import { confirmDoseTaken, getTodaySchedule } from "./actions/schedule";
 import { useCurrentUser } from "./lib/auth/use-current-user";
 import type { Dose, SchedulePatient } from "./lib/schedule/types";
@@ -201,15 +202,7 @@ export default function DashboardPage() {
           )}
         </section>
 
-        {notice && (
-          <div className="toast" role="status">
-            <Icon name="check" size={17} />
-            {notice}
-            <button onClick={() => setNotice("")} aria-label="Dismiss">
-              ×
-            </button>
-          </div>
-        )}
+        <Toast message={notice} onDismiss={() => setNotice("")} />
 
         <div className="section-heading">
           <div>

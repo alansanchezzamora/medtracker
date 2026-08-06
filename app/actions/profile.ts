@@ -2,6 +2,7 @@
 
 import { createClient } from "@/app/lib/supabase/server";
 import type { CarePreferences } from "@/app/lib/profiles/types";
+import { toUserMessage } from "@/app/lib/user-error";
 
 const INTERNATIONAL_PHONE_PATTERN = /^\+[1-9]\d{7,14}$/;
 
@@ -35,7 +36,7 @@ export async function getCarePreferences(): Promise<GetPreferencesResult> {
     .maybeSingle();
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: toUserMessage("profile.getCarePreferences", error, "Couldn't load your preferences. Please try again.") };
   }
 
   // Ensure a row exists for users created before the profiles table.
@@ -44,7 +45,7 @@ export async function getCarePreferences(): Promise<GetPreferencesResult> {
       id: user.id,
     });
     if (insertError) {
-      return { ok: false, error: insertError.message };
+      return { ok: false, error: toUserMessage("profile.createProfile", insertError, "Couldn't set up your profile. Please try again.") };
     }
     return {
       ok: true,
@@ -120,7 +121,7 @@ export async function updateCarePreferences(
   );
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: toUserMessage("profile.updateCarePreferences", error, "Couldn't save your preferences. Please try again.") };
   }
 
   return { ok: true };

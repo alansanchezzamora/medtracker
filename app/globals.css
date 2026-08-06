@@ -31,6 +31,16 @@
     @apply cursor-pointer font-[inherit] text-inherit;
   }
 
+  button:disabled {
+    @apply cursor-not-allowed;
+  }
+
+  a:focus-visible,
+  button:focus-visible,
+  [role="button"]:focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-teal;
+  }
+
   h1,
   h2,
   h3 {

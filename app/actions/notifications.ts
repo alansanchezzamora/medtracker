@@ -2,6 +2,7 @@
 
 import { createClient } from "@/app/lib/supabase/server";
 import { getNotificationProvider } from "@/app/lib/notifications";
+import { toUserMessage } from "@/app/lib/user-error";
 
 export type TestWhatsAppResult =
   | {
@@ -32,7 +33,7 @@ export async function sendTestWhatsAppReminder(): Promise<TestWhatsAppResult> {
     .maybeSingle();
 
   if (profileError) {
-    return { ok: false, error: profileError.message };
+    return { ok: false, error: toUserMessage("notifications.profile", profileError, "Couldn't load your profile. Please try again.") };
   }
 
   if (!profile?.phone_number) {
@@ -60,8 +61,7 @@ export async function sendTestWhatsAppReminder(): Promise<TestWhatsAppResult> {
   if (!usingTwilio) {
     return {
       ok: false,
-      error:
-        "Twilio is not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, and TWILIO_WHATSAPP_CONTENT_SID in .env, then restart npm run dev.",
+      error: "WhatsApp messaging isn't set up yet. Ask your team to finish the Twilio setup, then try again.",
     };
   }
 
@@ -71,7 +71,7 @@ export async function sendTestWhatsAppReminder(): Promise<TestWhatsAppResult> {
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "Could not start Twilio provider.",
+      error: toUserMessage("notifications.provider", error, "WhatsApp messaging is unavailable right now. Please try again."),
     };
   }
 
